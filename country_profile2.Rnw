@@ -1,0 +1,379 @@
+\documentclass[nohyper,justified]{tufte-handout}
+%\documentclass{article}
+%\usepackage[absolute,showboxes]{textpos}
+\usepackage[absolute]{textpos}
+\usepackage{sidecap}
+%\usepackage{color}
+%\usepackage[usenames,dvipsnames,svgnames,table]{xcolor}
+
+
+
+\begin{document} 
+
+<<include=FALSE>>=
+opts_chunk$set(concordance=TRUE)
+@  
+
+\begin{wide}
+\section{\Huge Country Profile:  NEPAL}
+
+{\Large Electronic Disease Notification system data describing refugees from Nepal.}
+
+\hrulefill
+
+\end{wide}
+
+<<"tornadoplot", include=FALSE>>=
+library(sqldf)
+library(XLConnect)
+
+wb <- loadWorkbook ("C:/Users/bvy8/Desktop/Country_profile/country_profile_wb.xlsx")
+
+
+sexage <- readWorksheet (wb, sheet = "select_demog", startRow=4, startCol=1, header = TRUE)
+
+sexageall <- readWorksheet (wb, sheet = "All_demog", startRow=6, startCol=1, header = TRUE)
+
+#clean
+sexage$Year <-substr(sexage$Year, start=10, stop=14) 
+sexage$Country <- sexage$Country.Name
+sexage$Age <- sexage$Age.Group3
+sexage$Age [sexage$Age =="45+"] <- "45-64"
+
+sexageall$Age <- sexageall$Age.Group3
+sexageall$Age [sexageall$Age =="45+"] <- "45-64"
+
+sexage <- sexage[ , c(-1, -3)] 
+sexageall <- sexageall[ , -1]
+
+check <- sqldf("select Sex, sum(Total) from sexage
+    group by sex")
+check2 <- sqldf("select Age, sum(Total) from sexage
+    group by Age")
+
+# no unknown sex but have unknown age, get rid of unknown sex
+
+sexage <- subset(sexage, sexage$Sex != "Unknown")
+
+
+sexage$Total = ifelse(sexage$Sex %in% 'F', -1*sexage$Total, sexage$Total)  # convert female totals to negative numbers
+
+sexageall$Total = ifelse(sexageall$Sex %in% 'F', -1*sexageall$Total, sexageall$Total)
+
+# reverse order of age groups
+sexage$Age = factor(sexage$Age, levels = rev(unique(sexage$Age))) 
+
+sexageall$Age = factor(sexageall$Age, levels = rev(unique(sexageall$Age))) 
+
+#remove unknown age group and select Nepal
+sexageN = subset(sexage, sexage$Age != "Unknown" & sexage$Country=="NEPAL")
+
+# subset the overall refugee dataframe
+sexageall2 = subset(sexageall, sexageall$Age != "Unknown" & sexageall$Sex !="Unknown")
+
+@
+
+\begin{textblock*}{80mm}(12mm,110mm)
+
+\small Number of refugees from Nepal resettling in the U.S.
+\newline     by sex and age group, 2010-2013
+\normalsize
+\begin{figure}
+
+<<"tornado", echo=FALSE, eval=TRUE, results='asis', fig.width=5, fig.height=4>>=
+
+library(ggplot2)
+ggplot(sexageN, aes(x=Age, y=Total, fill=factor(Sex))) + 
+     geom_bar(stat="identity", position="identity") +  # error if stat= not included.  don't know why?!
+     coord_flip() + 
+     scale_fill_hue(l=40) + 
+     xlab("Age") + theme(axis.title.y = element_text(face="bold", size=20)) +
+     ylab("Sex") + theme(axis.title.x = element_text(face="bold", size=20)) 
+@     
+\end{figure}
+\end{textblock*}
+
+
+\begin{textblock*}{70mm}(120mm,120mm)
+\small Number of refugees from all countries resettling in the U.S. by sex and age group, 2010-2013
+\normalsize
+\begin{figure}
+<<"tornado2", echo=FALSE, eval=TRUE, results='asis', fig.width=5, fig.height=4>>=
+
+library(ggplot2)
+ggplot(sexageall2, aes(x=Age, y=Total, fill=factor(Sex))) + 
+     geom_bar(stat="identity", position="identity") +  # error if stat= not included.  don't know why?!
+     coord_flip() + 
+     scale_fill_hue(l=40) + 
+     xlab("Age") + theme(axis.title.y = element_text(face="bold", size=20)) +
+     ylab("Sex") + theme(axis.title.x = element_text(face="bold", size=20))  
+@     
+\end{figure}
+\end{textblock*}
+
+
+<<"for_map", include=FALSE>>=
+
+# bring in data
+
+library(XLConnect)
+
+wb <- loadWorkbook ("C:/Users/bvy8/Desktop/Country_profile/country_profile_wb.xlsx")
+
+st <- readWorksheet(wb, sheet="select_st", startRow=5, startCol=1, header=TRUE)
+
+st$Country <- st$Country.Name
+st$State <- st$State.Name
+st$State <- tolower(st$State)
+st <- st[ ,c(-1,-2)]
+
+stN <-subset(st, st$Country=="NEPAL") 
+
+
+library(maps)
+library(ggplot2)
+
+all_states <- map_data("state")
+
+combo <- merge(stN, all_states, by.x="State", by.y="region", all=TRUE )
+
+combo2 <- subset(combo, combo$long != "NA")
+@
+
+
+\begin{textblock*} {90mm}(110mm,50mm)
+\small Arrival states of Nepal refugees, 2008-2013
+\begin{figure}
+
+<<"map", echo=FALSE, eval=TRUE, results='asis', fig.width=22, fig.height=15>>=
+p <- ggplot()
+
+p <- p + geom_polygon(data=combo2, aes(x=long, y=lat, group = group, fill=combo2$Total),colour="white") + scale_fill_continuous(low = "thistle2", high = "darkred", guide="colorbar")
+
+P1 <- p + theme_bw() #+ labs(fill = "Number of refugees",  x="", y="")
+
+P1 + scale_y_continuous(breaks=c()) + scale_x_continuous(breaks=c()) + theme(panel.border =  element_blank(), legend.title= element_text(size=12)) 
+
+@
+
+\end{figure}
+\end{textblock*}
+
+<<"B1pulm", include=FALSE>>=
+library(XLConnect)
+
+wb <- loadWorkbook ("C:/Users/bvy8/Desktop/Country_profile/country_profile_wb.xlsx")
+
+pulm <- readWorksheet(wb, sheet="select_B1pulm", startRow=4, startCol=1, header=TRUE)
+
+pulmall <- readWorksheet(wb, sheet="All_B1pulm", startRow=6, startCol=1, header=TRUE)
+
+#clean
+pulm$Country <- pulm$CountryName
+pulm$B1pulm <- pulm$ClassB1Pulmonary
+pulm$Year <-substr(pulm$Year, start=10, stop=14) 
+pulm$Age <- pulm$Age.Group3
+pulm$Age [pulm$Age =="45+"] <- "45-64"
+
+pulmall$B1pulm <- pulmall$ClassB1Pulmonary
+pulmall$Year <-substr(pulmall$Year, start=10, stop=14) 
+
+pulm <- pulm[ , c(-1,-3, -4)] 
+pulmall <- pulmall[ , -2] 
+
+#pick a country
+pulmN <-subset(pulm, pulm$Country=="NEPAL") 
+
+
+library(sqldf)
+pulmNagg <- sqldf("select Country, Age, Year, sum(Total) as Total from pulmN
+    group by Country, Age, Year")
+
+pulmNagg2 <- sqldf("select Country, Age, Year, B1pulm, sum(Total) as B1pulmonary from pulmN  GROUP BY
+        Country, Age, Year, B1pulm
+                having B1pulm='1'")
+
+pulmNcombo<- sqldf("select pulmNagg.*, pulmNagg2.B1pulmonary
+    from pulmNagg left join pulmNagg2 on
+        pulmNagg.Country = pulmNagg2.Country
+                  and
+        pulmNagg.Age = pulmNagg2.Age
+                  and
+        pulmNagg.Year = pulmNagg2.Year")
+
+pulmNcombo$Rate_per_1000 <- (pulmNcombo$B1pulmonary/pulmNcombo$Total)*1000 
+
+#order the columns
+pulmNcombo <- sqldf("select  Country, Year, Age, B1Pulmonary, Total, Rate_per_1000  from pulmNcombo  ")
+
+
+#add in all ages group
+pulmNallagg <- sqldf("select Country, Year, sum(Total) as Total from pulmN
+    group by Country, Year")
+
+pulmNallagg2 <- sqldf("select Country, Year, B1pulm, sum(Total) as B1pulmonary from pulmN  GROUP BY
+        Country, Year, B1pulm
+                having B1pulm='1'")
+
+pulmNallcombo<- sqldf("select pulmNallagg.*, pulmNallagg2.B1pulmonary
+    from pulmNallagg left join pulmNallagg2 on
+        pulmNallagg.Country = pulmNallagg2.Country
+                  and
+        pulmNallagg.Year = pulmNallagg2.Year")
+
+pulmNallcombo$Rate_per_1000 <- (pulmNallcombo$B1pulmonary/pulmNallcombo$Total)*1000 
+
+pulmNallcombo$Age <- "All"
+
+#order the columns
+pulmNallcombo <- sqldf("select  Country, Year, Age, B1Pulmonary, Total, Rate_per_1000  from pulmNallcombo")
+
+
+# concatenate all ages to age specific dataframes
+
+pulmNcomplete <- sqldf("select * from pulmNcombo
+      Union all   select * from pulmNallcombo")
+
+
+# add all refugee data
+
+pulmallagg <- sqldf("select Year, sum(Total) as Total from pulmall group by Year")
+
+pulmallagg2 <- sqldf("select Year, B1pulm, sum(Total) as B1pulmonary from pulmall  GROUP BY Year, B1pulm
+                having B1pulm='1'")
+
+pulmallcombo<- sqldf("select pulmallagg.*, pulmallagg2.B1pulmonary
+    from pulmallagg left join pulmallagg2 on
+        pulmallagg.Year = pulmallagg2.Year")
+
+pulmallcombo$Rate_per_1000 <- (pulmallcombo$B1pulmonary/pulmallcombo$Total)*1000 
+
+pulmallcombo$Country <- "All"
+pulmallcombo$Age <- "All_refugees"
+
+#order the columns
+pulmallcombo <- sqldf("select  Country, Year, Age, B1Pulmonary, Total, Rate_per_1000  from pulmallcombo")
+
+# concatenate country-specific to all data
+
+pulmcomplete <- sqldf("select * from pulmNcomplete
+      Union all   select * from pulmallcombo")
+
+#remove unknown age group so don't plot
+pulmcomplete2 <- sqldf("select * from pulmcomplete
+    where Age != 'Unknown' ")
+@
+
+<<"B1pulm_datasets", include=FALSE>>=
+
+# make 2 datasets
+# 1 compare all Nepal vs. all refugees
+# 1 show age groups for Nepal
+
+# first All ages 
+B1allage <- pulmcomplete2[25:36, ]
+
+# age-specific
+B1agespecific <- pulmcomplete2[1:24, ]
+@
+
+ 
+\begin{textblock*} {90mm}(15mm,184mm)
+
+\small Rate of B1 pulmonary status per 1,000 refugees
+\begin{figure}
+<<"B1pulm_fig1", echo=FALSE, eval=TRUE, results='asis'>>=
+library(ggplot2)
+library(RColorBrewer)
+
+ggplot(data=B1allage, aes(x=Year, y=Rate_per_1000, colour=Country)) + geom_point(size=4) +  geom_line(size=1.5, aes(group=Country)) + scale_color_manual(values=c("red", "black"))
+
+@
+\end{figure}
+\end{textblock*}
+
+\begin{textblock*} {80mm}(120mm,190mm)
+\small Rate of B1 pulmonary status per 1,000 refugees by age group:  Nepal 
+\begin{figure}
+<<"B1pulm_fig2", echo=FALSE, eval=TRUE, results='asis'>>=
+library(ggplot2)
+library(RColorBrewer)
+
+ggplot(data=B1agespecific, aes(x=Year, y=Rate_per_1000, colour=Age)) + geom_point(size=4) +  geom_line(size=1.5, aes(group=Age)) + scale_color_manual(values=c("blue", "orange",  "red", "#009E73")) 
+
+@
+\end{figure}
+\end{textblock*}
+
+
+
+
+<<"table", include=FALSE>>=
+library(XLConnect)
+
+wb <- loadWorkbook ("C:/Users/bvy8/Desktop/Country_profile/country_profile_wb.xlsx")
+
+d <- readWorksheet(wb, sheet="select_demog", startRow=4, startCol=1, header=TRUE)
+
+dall <- readWorksheet(wb, sheet="All_demog_yr", startRow=6, startCol=1, header=TRUE)
+
+#clean up vars
+d$Year <-substr(d$Year, start=10, stop=14) 
+d$Age <- d$Age.Group3
+d$Country <- d$Country.Name
+d$Age [d$Age =="45+"] <- "45-64"
+
+dall$Year <-substr(dall$Year, start=10, stop=14) 
+
+d <- d[ , c(-1,-3)] 
+@
+
+
+<<"Nepal_table", include=FALSE>>=
+library(sqldf)
+N <- sqldf("select Year, sum(Total) as Total from d where Country='NEPAL' group by Year")
+
+N$Country <- "Nepal"
+dall$Country <- "All"
+
+#order vars
+N <- sqldf("select Year, Country, Total from N") 
+dall <- sqldf("select Year, Country, Total from dall") 
+
+Nallcombo <- sqldf("select * from N Union all
+    select * from dall")
+
+tab <- xtabs (Total ~ Country + Year, Nallcombo)
+tab
+@ 
+
+
+
+\begin{textblock*} {100mm}(15mm,50mm)
+\small Number of refugee arrivals to the U.S.
+\normalsize
+\begin{figure}
+
+<<"nepal_table_print", echo=FALSE, eval=TRUE, results='asis'>>=
+library(xtable)
+
+Tabyr <- xtable(tab, digits=0)
+print(Tabyr, include.rownames=TRUE)
+
+
+@
+
+\end{figure}
+\end{textblock*}
+
+\begin{textblock*} {80mm}(88mm,150mm)
+\small -  -   -   -   -   -   -   -   -   -   -   -   ->
+
+\end{textblock*}
+
+
+\begin{textblock*} {100mm}(70mm,205mm)
+\small -  -   -   -   -   -   -   -   -   -   -   -  -  -  -   -  -  -  -   -  -  -  -  -->
+\end{textblock*}
+
+\end{document}
